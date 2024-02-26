@@ -26,6 +26,7 @@ def clip_grad_norm_(parameters, max_norm):
     clip_coef = Tensor.maximum(clip_coef, 1.0)
     for g in grads:
         g *= clip_coef
+        g.realize()
     return total_norm
 
 
@@ -105,8 +106,8 @@ class Logger:
 
 
 class EMAScalar:
-    def __init__(self, decay) -> None:
-        self.scalar = 0.0
+    def __init__(self, decay: float) -> None:
+        self.scalar = Tensor(0.0)
         self.decay = decay
 
     def __call__(self, value):
@@ -114,7 +115,9 @@ class EMAScalar:
         return self.get()
 
     def update(self, value):
-        self.scalar = self.scalar * self.decay + value * (1 - self.decay)
+        self.scalar *= self.decay
+        self.scalar += value * (1 - self.decay)
+        self.scalar.realize()
 
     def get(self):
         return self.scalar

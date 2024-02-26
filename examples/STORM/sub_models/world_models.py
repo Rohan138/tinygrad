@@ -2,8 +2,7 @@
 # import torch.nn as tnn
 # import torch.nn.functional as F
 
-from tinygrad import Tensor, dtypes, nn
-import tinygrad
+from tinygrad import Tensor, dtypes, nn, TinyJit
 from tinygrad.nn.state import get_state_dict, get_parameters
 from distributions import OneHotCategorical, Normal
 import distributions
@@ -534,7 +533,8 @@ class WorldModel:
             termination_hat_buffer,
         )
 
-    def update(self, obs, action, reward, termination, logger=None):
+    @TinyJit
+    def update(self, obs, action, reward, termination):
         # self.train()
         batch_size, batch_length = obs.shape[:2]
 
@@ -585,15 +585,15 @@ class WorldModel:
         clip_grad_norm_(self.parameters(), max_norm)
         self.optimizer.step()
 
-        if logger is not None:
-            logger.log("WorldModel/reconstruction_loss", reconstruction_loss.item())
-            logger.log("WorldModel/reward_loss", reward_loss.item())
-            logger.log("WorldModel/termination_loss", termination_loss.item())
-            logger.log("WorldModel/dynamics_loss", dynamics_loss.item())
-            logger.log("WorldModel/dynamics_real_kl_div", dynamics_real_kl_div.item())
-            logger.log("WorldModel/representation_loss", representation_loss.item())
-            logger.log(
-                "WorldModel/representation_real_kl_div",
-                representation_real_kl_div.item(),
-            )
-            logger.log("WorldModel/total_loss", total_loss.item())
+        metrics = {
+            "WorldModel/reconstruction_loss": reconstruction_loss.realize(),
+            "WorldModel/reward_loss": reward_loss.realize(),
+            "WorldModel/termination_loss": termination_loss.realize(),
+            "WorldModel/dynamics_loss": dynamics_loss.realize(),
+            "WorldModel/dynamics_real_kl_div": dynamics_real_kl_div.realize(),
+            "WorldModel/representation_loss": representation_loss.realize(),
+            "WorldModel/representation_real_kl_div": representation_real_kl_div.realize(),
+            "WorldModel/total_loss": total_loss.realize(),
+        }
+
+        return metrics

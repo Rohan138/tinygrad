@@ -63,13 +63,16 @@ def train_world_model_step(
     batch_size,
     demonstration_batch_size,
     batch_length,
-    logger,
+    logger: Logger,
 ):
     obs, action, reward, termination = replay_buffer.sample(
         batch_size, demonstration_batch_size, batch_length
     )
     # print(obs.shape, action.shape, reward.shape, termination.shape)
-    world_model.update(obs, action, reward, termination, logger=logger)
+    metrics = world_model.update(obs, action, reward, termination)
+    metrics = {k: v.item() for k, v in metrics.items()}
+    for k, v in metrics.items():
+        logger.log(k, v)
 
 
 # @torch.no_grad()
@@ -269,15 +272,21 @@ def joint_train_world_model_agent(
                 logger=logger,
             )
 
-            agent.update(
+            # detach all inputs
+            imagine_latent = imagine_latent.detach()
+            agent_action = agent_action.detach()
+            imagine_reward = imagine_reward.detach()
+            imagine_termination = imagine_termination.detach()
+
+            metrics = agent.update(
                 latent=imagine_latent,
                 action=agent_action,
-                old_logprob=agent_logprob,
-                old_value=agent_value,
                 reward=imagine_reward,
                 termination=imagine_termination,
-                logger=logger,
             )
+            metrics = {k: v.item() for k, v in metrics.items()}
+            for k, v in metrics.items():
+                logger.log(k, v)
         # <<< train agent part
 
         # save model per episode
