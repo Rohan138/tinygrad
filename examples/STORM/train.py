@@ -4,7 +4,7 @@ import numpy as np
 
 from line_profiler import profile
 
-from tinygrad import Tensor
+from tinygrad import Tensor, nn
 from collections import deque
 from tqdm import tqdm
 
@@ -292,8 +292,8 @@ def joint_train_world_model_agent(
             # torch.save(world_model.state_dict(), f"ckpt/{args.n}/world_model_{total_steps}.pth")
             # torch.save(agent.state_dict(), f"ckpt/{args.n}/agent_{total_steps}.pth")
 
-            # nn.state.safe_save(nn.state.get_state_dict(world_model), f"ckpt/{args.n}/world_model_{total_steps}.bin")
-            # nn.state.safe_save(nn.state.get_state_dict(agent), f"ckpt/{args.n}/agent_{total_steps}.bin")
+            nn.state.safe_save(nn.state.get_state_dict(world_model), f"ckpt/{args.n}/world_model_{total_steps}.safetensors")
+            nn.state.safe_save(nn.state.get_state_dict(agent), f"ckpt/{args.n}/agent_{total_steps}.safetensors")
 
 
 def build_world_model(conf, action_dim):
