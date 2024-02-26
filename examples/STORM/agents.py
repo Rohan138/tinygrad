@@ -14,7 +14,7 @@ import copy
 # from torch.cuda.amp import autocast
 
 from sub_models.functions_losses import SymLogTwoHotLoss
-from utils import EMAScalar
+from utils import EMAScalar, clip_grad_norm_
 
 
 def percentile(x:Tensor, percentage):
@@ -198,16 +198,12 @@ class ActorCriticAgent:
         
         
         # NEW gradient descent
-        # self.optimizer.zero_grad()
-        # loss.backward()
-        # # Add clip gradient norm
-        # max_norm = 100.0
-        # for p in get_parameters(self):
-        #     grad_norm = p.grad.normal()
-        #     if grad_norm > max_norm:
-        #         p.grad = p.grad * (max_norm / grad_norm)
+        self.optimizer.zero_grad()
+        loss.backward()
+        # Add clip gradient norm
+        clip_grad_norm_(self.parameters(), 100.0)
         
-        # self.optimizer.step()
+        self.optimizer.step()
         
 
         # self.update_slow_critic()

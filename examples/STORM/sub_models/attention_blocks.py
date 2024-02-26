@@ -59,7 +59,7 @@ class ScaledDotProductAttention:
 
         return output, attn
     def __call__(self, q, k, v, mask=None):
-        return self.forward(q, k, v, mask=mask)
+        return Tensor.scaled_dot_product_attention(q, k, v, mask=mask, dropout=self.dropoutVal)
 
 
 class MultiHeadAttention:
@@ -108,7 +108,6 @@ class MultiHeadAttention:
         q = q.transpose(1, 2).contiguous().reshape((sz_b, len_q, -1))
         # q = self.dropout(self.fc(q))
         q = self.fc(q).dropout(self.dropoutVal)
-        residual.requires_grad = False
         q = q +residual
 
         q = self.layer_norm(q)
@@ -130,12 +129,11 @@ class PositionwiseFeedForward:
     def forward(self, x):
 
         residual = x
-        residual.requires_grad = False
 
         # x = self.w_2(F.relu(self.w_1(x)))
         x = self.w_2(self.w_1(x).relu())
         x = x.dropout(self.dropoutVal)
-        x = x+ residual
+        x = x + residual
 
         x = self.layer_norm(x)
 

@@ -10,7 +10,7 @@ import distributions
 # from einops import rearrange, repeat, reduce
 # from einops.layers.torch import Rearrange
 # from torch.cuda.amp import autocast
-from utils import cross_entropy
+from utils import cross_entropy, clip_grad_norm_
 from sub_models.functions_losses import SymLogTwoHotLoss
 from sub_models.attention_blocks import get_subsequent_mask_with_batch_length, get_subsequent_mask
 from sub_models.transformer_model import StochasticTransformerKVCache
@@ -225,11 +225,7 @@ class TerminationDecoder:
         return self.forward(feat)
 
 class MSELoss:
-    def __init__(self) -> None:
-        # super().__init__()
-        pass
-
-    def forward(self, obs_hat, obs):
+    def forward(self, obs_hat: Tensor, obs: Tensor):
         loss = (obs_hat - obs)**2
         # loss = reduce(loss, "B L C H W -> B L", "sum")
         loss = loss.sum(-1).sum(-1).sum(-1)
@@ -253,7 +249,7 @@ class CategoricalKLDivLossWithFreeBits:
         kl_div = kl_div.mean()
         real_kl_div = kl_div
         # kl_div = torch.max(torch.ones_like(kl_div)*self.free_bits, kl_div)
-        kl_div = Tensor.max(Tensor.ones_like(kl_div)*self.free_bits, kl_div)
+        kl_div = Tensor.maximum(kl_div, 1*self.free_bits)
         return kl_div, real_kl_div
     def __call__(self, p_logits, q_logits):
         return self.forward(p_logits, q_logits)
@@ -262,8 +258,6 @@ class CategoricalKLDivLossWithFreeBits:
 class WorldModel:
     def __init__(self, in_channels, action_dim,
                  transformer_max_length, transformer_hidden_dim, transformer_num_layers, transformer_num_heads):
-        # super().__init__()
-        Tensor.no_grad = False
         self.transformer_hidden_dim = transformer_hidden_dim
         self.final_feature_width = 4
         self.stoch_dim = 32
@@ -318,7 +312,7 @@ class WorldModel:
         self.symlog_twohot_loss_func = SymLogTwoHotLoss(num_classes=255, lower_bound=-20, upper_bound=20)
         self.categorical_kl_div_loss = CategoricalKLDivLossWithFreeBits(free_bits=1)
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
-        self.optimizer = nn.optim.Adam(get_parameters(self), lr=1e-4)
+        self.optimizer = nn.optim.Adam(self.parameters(), lr=1e-4)
         # self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
        
        
@@ -326,6 +320,17 @@ class WorldModel:
             # p.realize()
             # if p.requires_grad:
             #     p.grad = Tensor.zeros_like(p)
+    
+    def parameters(self):
+        models = [
+            self.encoder,
+            self.storm_transformer,
+            self.dist_head,
+            self.image_decoder,
+            self.reward_decoder,
+            self.termination_decoder,
+        ]
+        return get_parameters(models)
 
     def encode_obs(self, obs):
         # with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
@@ -367,7 +372,7 @@ class WorldModel:
     def stright_throught_gradient(self, logits, sample_mode="random_sample"):
         dist = OneHotCategorical(logits=logits)
         if sample_mode == "random_sample":
-            sample = dist.sample() + dist.probs - dist.probs.detach()
+            sample = dist.sample()
         elif sample_mode == "mode":
             sample = dist.mode
         elif sample_mode == "probs":
@@ -450,7 +455,6 @@ class WorldModel:
 
     def update(self, obs, action, reward, termination, logger=None):
         # self.train()
-        Tensor.no_grad = False
         batch_size, batch_length = obs.shape[:2]
 
         # with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
@@ -489,18 +493,14 @@ class WorldModel:
         # self.scaler.update()
         # self.optimizer.zero_grad(set_to_none=True)
 
+        self.optimizer.zero_grad()
         # NEW gradient descent
-        total_loss.realize()
         total_loss.backward()
         # Add clip gradient norm
         max_norm = 1000.0
-        for p in get_parameters(self):
-            grad_norm = p.grad.normal()
-            if grad_norm > max_norm:
-                p.grad = p.grad * (max_norm / grad_norm)
+        clip_grad_norm_(self.parameters(), max_norm)
         
         self.optimizer.step()
-        self.optimizer.zero_grad()
         if logger is not None:
             logger.log("WorldModel/reconstruction_loss", reconstruction_loss.item())
             logger.log("WorldModel/reward_loss", reward_loss.item())

@@ -12,9 +12,9 @@ JointTrainAgent:
   NumEnvs: 1
   BatchSize: 16
   DemonstrationBatchSize: 4
-  BatchLength: 64
-  ImagineBatchSize: 1024
-  ImagineDemonstrationBatchSize: 256
+  BatchLength: 16
+  ImagineBatchSize: 256
+  ImagineDemonstrationBatchSize: 64
   ImagineContextLength: 8
   ImagineBatchLength: 16
   TrainDynamicsEverySteps: 1
@@ -25,14 +25,14 @@ JointTrainAgent:
 Models:
   WorldModel:
     InChannels: 3
-    TransformerMaxLength: 64
-    TransformerHiddenDim: 512
-    TransformerNumLayers: 2
+    TransformerMaxLength: 16
+    TransformerHiddenDim: 256
+    TransformerNumLayers: 1
     TransformerNumHeads: 8
 
   Agent:
-    NumLayers: 2
-    HiddenDim: 512
+    NumLayers: 1
+    HiddenDim: 256
     Gamma: 0.985
     Lambda: 0.95
     EntropyCoef: 3E-4

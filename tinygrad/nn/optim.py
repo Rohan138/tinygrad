@@ -56,7 +56,7 @@ class LAMB(Optimizer):
   def step(self) -> None:
     self.t.assign(self.t + 1)
     for i, t in enumerate(self.params):
-      assert t.grad is not None
+      assert t.grad is not None, t.shape
       self.m[i].assign(self.b1 * self.m[i] + (1.0 - self.b1) * t.grad)
       self.v[i].assign(self.b2 * self.v[i] + (1.0 - self.b2) * (t.grad * t.grad))
       m_hat = self.m[i] / (1.0 - self.b1**self.t)

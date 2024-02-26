@@ -10,6 +10,22 @@ import time
 import yacs
 from yacs.config import CfgNode as CN
 
+def clip_grad_norm_(parameters, max_norm):
+    grads = [p.grad for p in parameters if p.grad is not None]
+    if len(grads) == 0:
+        return Tensor(0.0)
+
+    def l2_norm(x):
+        return Tensor.sqrt(Tensor.sum(Tensor.square(x)))
+
+    norms = [l2_norm(g) for g in grads]
+    total_norm = l2_norm(Tensor.stack(norms))
+    clip_coef = max_norm / (total_norm + 1e-6)
+    clip_coef = Tensor.maximum(clip_coef, 1.0)
+    for g in grads:
+        g *= clip_coef
+    return total_norm
+
 def cross_entropy(x:Tensor, y:Tensor, reduction:str='mean', label_smoothing:float=0.0) -> Tensor:
     divisor = y.shape[1]
     assert isinstance(divisor, int), "only supported int divisor"
