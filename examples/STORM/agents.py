@@ -228,7 +228,7 @@ class ActorCriticAgent:
         # upper_bound = self.upperbound_ema(percentile(lambda_return, 0.95))
         # S = upper_bound - lower_bound
         S = 0.0
-        norm_ratio = Tensor.max(Tensor.ones(1), S)  # max(1, S) in the paper
+        norm_ratio = Tensor.maximum(Tensor.ones(1), S)  # max(1, S) in the paper
         norm_advantage = (lambda_return - value[:, :-1]) / norm_ratio
         policy_loss = -(log_prob * norm_advantage.detach()).mean()
 
