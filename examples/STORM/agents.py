@@ -151,9 +151,7 @@ class ActorCriticAgent:
         for slow_param, param in zip(
             get_parameters(self.slow_critic), get_parameters(self.critic)
         ):
-            slow_param *= decay
-            slow_param += param.detach() * (1 - decay)
-            slow_param.realize()
+            slow_param.assign(decay * slow_param + (1 - decay) * param).realize()
 
     def policy(self, x):
         # logits = self.actor(x)
@@ -225,10 +223,11 @@ class ActorCriticAgent:
             raw_value[:, :-1], slow_lambda_return.detach()
         )
 
-        lower_bound = self.lowerbound_ema(percentile(lambda_return, 0.05))
-        upper_bound = self.upperbound_ema(percentile(lambda_return, 0.95))
-        S = upper_bound - lower_bound
-        # norm_ratio = torch.max(torch.ones(1).cuda(), S)  # max(1, S) in the paper
+        # TODO (Rohan138): reenable EMA if it wasn't so slow
+        # lower_bound = self.lowerbound_ema(percentile(lambda_return, 0.05))
+        # upper_bound = self.upperbound_ema(percentile(lambda_return, 0.95))
+        # S = upper_bound - lower_bound
+        S = 0.0
         norm_ratio = Tensor.max(Tensor.ones(1), S)  # max(1, S) in the paper
         norm_advantage = (lambda_return - value[:, :-1]) / norm_ratio
         policy_loss = -(log_prob * norm_advantage.detach()).mean()

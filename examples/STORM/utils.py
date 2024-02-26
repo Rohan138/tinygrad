@@ -6,9 +6,6 @@ from tensorboardX import SummaryWriter
 
 # from einops import repeat
 from tinygrad import Tensor
-from contextlib import contextmanager
-import time
-import yacs
 from yacs.config import CfgNode as CN
 
 
@@ -115,9 +112,9 @@ class EMAScalar:
         return self.get()
 
     def update(self, value):
-        self.scalar *= self.decay
-        self.scalar += value * (1 - self.decay)
-        self.scalar.realize()
+        self.scalar.assign(
+            self.scalar * self.decay + value * (1 - self.decay)
+        ).realize()
 
     def get(self):
         return self.scalar

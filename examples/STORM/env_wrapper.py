@@ -2,8 +2,6 @@ import gymnasium
 import numpy as np
 from collections import deque
 import cv2
-from einops import rearrange
-import copy
 
 
 class LifeLossInfo(gymnasium.Wrapper):

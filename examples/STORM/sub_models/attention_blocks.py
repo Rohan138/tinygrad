@@ -7,7 +7,6 @@ from tinygrad import Tensor, dtypes, nn
 import tinygrad
 
 # import numpy as np
-from einops import rearrange, repeat
 
 
 def get_subsequent_mask(seq):

@@ -13,7 +13,7 @@ JointTrainAgent:
   BatchSize: 8
   DemonstrationBatchSize: 4
   BatchLength: 8
-  ImagineBatchSize: 8
+  ImagineBatchSize: 16
   ImagineDemonstrationBatchSize: 8
   ImagineContextLength: 8
   ImagineBatchLength: 8
