@@ -578,15 +578,6 @@ class WorldModel:
             + 0.5 * dynamics_loss
             + 0.1 * representation_loss
         )
-        # total_loss = Tensor((reconstruction_loss + reward_loss + termination_loss + 0.5*dynamics_loss + 0.1*representation_loss).numpy(), requires_grad=True)
-        print("TOTAL_LOSS:", total_loss, total_loss.shape, total_loss.numpy())
-        # # gradient descent
-        # self.scaler.scale(total_loss).backward()
-        # self.scaler.unscale_(self.optimizer)  # for clip grad
-        # torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1000.0)
-        # self.scaler.step(self.optimizer)
-        # self.scaler.update()
-        # self.optimizer.zero_grad(set_to_none=True)
 
         self.optimizer.zero_grad()
         total_loss.backward()

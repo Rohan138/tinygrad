@@ -10,13 +10,13 @@ JointTrainAgent:
   BufferMaxLength: 100000
   BufferWarmUp: 1024
   NumEnvs: 1
-  BatchSize: 16
+  BatchSize: 8
   DemonstrationBatchSize: 4
-  BatchLength: 16
-  ImagineBatchSize: 256
-  ImagineDemonstrationBatchSize: 64
+  BatchLength: 8
+  ImagineBatchSize: 8
+  ImagineDemonstrationBatchSize: 8
   ImagineContextLength: 8
-  ImagineBatchLength: 16
+  ImagineBatchLength: 8
   TrainDynamicsEverySteps: 1
   TrainAgentEverySteps: 1
   UseDemonstration: False
@@ -26,13 +26,13 @@ Models:
   WorldModel:
     InChannels: 3
     TransformerMaxLength: 64
-    TransformerHiddenDim: 256
+    TransformerHiddenDim: 32
     TransformerNumLayers: 1
-    TransformerNumHeads: 8
+    TransformerNumHeads: 2
 
   Agent:
     NumLayers: 1
-    HiddenDim: 256
+    HiddenDim: 32
     Gamma: 0.985
     Lambda: 0.95
     EntropyCoef: 3E-4

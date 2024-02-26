@@ -120,7 +120,7 @@ class ActorCriticAgent:
         self.upperbound_ema = EMAScalar(decay=0.99)
 
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=3e-5, eps=1e-5)
-        self.optimizer = nn.optim.Adam(get_parameters(self), lr=3e-5, eps=1e-5)
+        self.optimizer = nn.optim.Adam(self.parameters(), lr=3e-5, eps=1e-5)
         # self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
 
     def parameters(self):
@@ -133,7 +133,8 @@ class ActorCriticAgent:
         for slow_param, param in zip(
             get_parameters(self.slow_critic), get_parameters(self.critic)
         ):
-            slow_param.data.copy_(slow_param.data * decay + param.data * (1 - decay))
+            slow_param *= decay
+            slow_param += param.detach() * (1 - decay)
 
     def policy(self, x):
         # logits = self.actor(x)
@@ -245,7 +246,7 @@ class ActorCriticAgent:
 
         self.optimizer.step()
 
-        # self.update_slow_critic()
+        self.update_slow_critic()
 
         if logger is not None:
             logger.log("ActorCritic/policy_loss", policy_loss.item())
