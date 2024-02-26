@@ -42,13 +42,10 @@ class ScaledDotProductAttention:
         self.temperature = temperature
         self.dropoutVal = attn_dropout
 
-    def forward(self, q, k, v, mask=None):
+    def forward(self, q, k, v, mask: Tensor=None):
         # attn = torch.matmul(q / self.temperature, k.transpose(2, 3))
         attn = Tensor.matmul(q / self.temperature, k.transpose(2, 3))
         if mask is not None:
-            # IMPLEMENTTHISSSSSSSSSs
-            # attn = attn.masked_fill(mask == 0, -1e9)
-            # attn_mask = (mask == 0).where(-float("inf"), 0)
             attn_mask = (mask == 0).where(-1e9, 0)
             attn = attn + attn_mask
 
@@ -59,7 +56,7 @@ class ScaledDotProductAttention:
 
         return output, attn
     def __call__(self, q, k, v, mask=None):
-        return Tensor.scaled_dot_product_attention(q, k, v, mask=mask, dropout=self.dropoutVal)
+        return self.forward(q, k, v, mask)
 
 
 class MultiHeadAttention:

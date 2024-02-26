@@ -131,7 +131,7 @@ class StochasticTransformerKVCache:
             # self.kv_cache_list.append(torch.zeros(size=(batch_size, 0, self.feat_dim), dtype=dtype, device="cuda"))
             self.kv_cache_list.append(Tensor.zeros((batch_size, 0, self.feat_dim), dtype=dtype))
 
-    def forward_with_kv_cache(self, samples, action:Tensor):
+    def forward_with_kv_cache(self, samples, action):
         '''
         Forward pass with kv_cache, cache stored in self.kv_cache_list
         '''

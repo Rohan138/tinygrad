@@ -38,7 +38,6 @@ def calc_lambda_return(rewards, values, termination, gamma, lam, dtype=dtypes.fl
     # gae_step = torch.zeros((batch_size, ), dtype=dtype, device="cuda")
     # gamma_return = torch.zeros((batch_size, batch_length+1), dtype=dtype, device="cuda")
     gamma_return = Tensor.zeros((batch_size, batch_length+1), dtype=dtype)
-    values.requires_grad = False
     gamma_return[:, -1] = values[:, -1]
     for t in reversed(range(batch_length)):  # with last bootstrap
         gamma_return[:, t] = \

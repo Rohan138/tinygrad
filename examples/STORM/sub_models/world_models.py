@@ -314,12 +314,6 @@ class WorldModel:
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
         self.optimizer = nn.optim.Adam(self.parameters(), lr=1e-4)
         # self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
-       
-       
-        # for p in get_parameters(self):
-            # p.realize()
-            # if p.requires_grad:
-            #     p.grad = Tensor.zeros_like(p)
     
     def parameters(self):
         models = [
@@ -383,33 +377,14 @@ class WorldModel:
         # return rearrange(sample, "B L K C -> B L (K C)")
         return sample.reshape(sample.shape[0], sample.shape[1], sample.shape[2]*sample.shape[3])
 
-    def init_imagine_buffer(self, imagine_batch_size, imagine_batch_length, dtype):
-        '''
-        This can slightly improve the efficiency of imagine_data
-        But may vary across different machines
-        '''
-        if self.imagine_batch_size != imagine_batch_size or self.imagine_batch_length != imagine_batch_length:
-            print(f"init_imagine_buffer: {imagine_batch_size}x{imagine_batch_length}@{dtype}")
-            self.imagine_batch_size = imagine_batch_size
-            self.imagine_batch_length = imagine_batch_length
-            latent_size = (imagine_batch_size, imagine_batch_length+1, self.stoch_flattened_dim)
-            hidden_size = (imagine_batch_size, imagine_batch_length+1, self.transformer_hidden_dim)
-            scalar_size = (imagine_batch_size, imagine_batch_length)
-            # self.latent_buffer = torch.zeros(latent_size, dtype=dtype, device="cuda")
-            self.latent_buffer = Tensor.zeros(latent_size, dtype=dtype)
-            # self.hidden_buffer = torch.zeros(hidden_size, dtype=dtype, device="cuda")
-            self.hidden_buffer = Tensor.zeros(hidden_size, dtype=dtype)
-            # self.action_buffer = torch.zeros(scalar_size, dtype=dtype, device="cuda")
-            self.action_buffer = Tensor.zeros(scalar_size, dtype=dtype)
-            # self.reward_hat_buffer = torch.zeros(scalar_size, dtype=dtype, device="cuda")
-            self.reward_hat_buffer = Tensor.zeros(scalar_size, dtype=dtype)
-            # self.termination_hat_buffer = torch.zeros(scalar_size, dtype=dtype, device="cuda")
-            self.termination_hat_buffer = Tensor.zeros(scalar_size, dtype=dtype)
-
     def imagine_data(self, agent: agents.ActorCriticAgent, sample_obs, sample_action,
                      imagine_batch_size, imagine_batch_length, log_video, logger):
-        self.init_imagine_buffer(imagine_batch_size, imagine_batch_length, dtype=self.tensor_dtype)
         obs_hat_list = []
+        latent_buffer = []
+        hidden_buffer = []
+        action_buffer = []
+        reward_hat_list = []
+        termination_hat_list = []
 
         self.storm_transformer.reset_kv_cache_list(imagine_batch_size, dtype=self.tensor_dtype)
         # context
@@ -420,38 +395,38 @@ class WorldModel:
                 sample_action[:, i:i+1],
                 log_video=log_video
             )
-        last_latent.requires_grad = False
-        last_dist_feat.requires_grad = False
-        self.latent_buffer[:, 0:1] = last_latent
-        self.hidden_buffer[:, 0:1] = last_dist_feat
+        latent_buffer.append(last_latent)
+        hidden_buffer.append(last_dist_feat)
 
         # imagine
         for i in range(imagine_batch_length):
             # action = agent.sample(torch.cat([self.latent_buffer[:, i:i+1], self.hidden_buffer[:, i:i+1]], dim=-1))
-            action = agent.sample(Tensor.cat(*[self.latent_buffer[:, i:i+1], self.hidden_buffer[:, i:i+1]], dim=-1))
-            action.requires_grad = False
-            self.action_buffer[:, i:i+1] = action
+            action = agent.sample(Tensor.cat(last_latent, last_dist_feat, dim=-1))
+            action_buffer.append(action)
 
             last_obs_hat, last_reward_hat, last_termination_hat, last_latent, last_dist_feat = self.predict_next(
-                self.latent_buffer[:, i:i+1], self.action_buffer[:, i:i+1], log_video=log_video)
-            last_latent.requires_grad = False
-            last_dist_feat.requires_grad = False
-            last_reward_hat.requires_grad = False
-            last_termination_hat.requires_grad = False
+                last_latent, action, log_video=log_video)
 
-            self.latent_buffer[:, i+1:i+2] = last_latent
-            self.hidden_buffer[:, i+1:i+2] = last_dist_feat
-            self.reward_hat_buffer[:, i:i+1] = last_reward_hat
-            self.termination_hat_buffer[:, i:i+1] = last_termination_hat
+            latent_buffer.append(last_latent)
+            hidden_buffer.append(last_dist_feat)
+            reward_hat_list.append(last_reward_hat)
+            termination_hat_list.append(last_termination_hat)
             if log_video:
                 obs_hat_list.append(last_obs_hat[::imagine_batch_size//16])  # uniform sample vec_env
 
         if log_video:
             # logger.log("Imagine/predict_video", torch.clamp(torch.cat(obs_hat_list, dim=1), 0, 1).cpu().float().detach().numpy())
-            logger.log("Imagine/predict_video", Tensor.clip(Tensor.cat(obs_hat_list, dim=1), 0., 1.).float().detach().numpy())
+            logger.log("Imagine/predict_video", Tensor.clip(Tensor.cat(obs_hat_list, dim=1), 0., 1.).float().numpy())
+        
+        # Convert buffers to tensors
+        latent_buffer = Tensor.stack(latent_buffer, dim=1)
+        hidden_buffer = Tensor.stack(hidden_buffer, dim=1)
+        action_buffer = Tensor.stack(action_buffer, dim=1)
+        reward_hat_buffer = Tensor.stack(reward_hat_list, dim=1)
+        termination_hat_buffer = Tensor.stack(termination_hat_list, dim=1)
 
         # return torch.cat([self.latent_buffer, self.hidden_buffer], dim=-1), self.action_buffer, self.reward_hat_buffer, self.termination_hat_buffer
-        return Tensor.cat(*[self.latent_buffer, self.hidden_buffer], dim=-1), self.action_buffer, self.reward_hat_buffer, self.termination_hat_buffer
+        return Tensor.cat(*[latent_buffer, hidden_buffer], dim=-1), action_buffer, reward_hat_buffer, termination_hat_buffer
 
     def update(self, obs, action, reward, termination, logger=None):
         # self.train()
@@ -494,13 +469,11 @@ class WorldModel:
         # self.optimizer.zero_grad(set_to_none=True)
 
         self.optimizer.zero_grad()
-        # NEW gradient descent
         total_loss.backward()
-        # Add clip gradient norm
         max_norm = 1000.0
         clip_grad_norm_(self.parameters(), max_norm)
-        
         self.optimizer.step()
+
         if logger is not None:
             logger.log("WorldModel/reconstruction_loss", reconstruction_loss.item())
             logger.log("WorldModel/reward_loss", reward_loss.item())
