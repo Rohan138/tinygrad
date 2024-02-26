@@ -247,10 +247,13 @@ def joint_train_world_model_agent(
             and total_steps % (train_agent_every_steps // num_envs) == 0
             and total_steps * num_envs >= 0
         ):
-            if total_steps % (save_every_steps // num_envs) == 0:
-                log_video = True
-            else:
-                log_video = False
+            # if total_steps % (save_every_steps // num_envs) == 0:
+            #     log_video = True
+            # else:
+            #     log_video = False
+
+            # TODO: enable video logging
+            log_video = False
 
             (
                 imagine_latent,
@@ -297,35 +300,18 @@ def joint_train_world_model_agent(
 
 
 def build_world_model(conf, action_dim):
-    w = WorldModel(
+    return WorldModel(
         in_channels=conf.Models.WorldModel.InChannels,
         action_dim=action_dim,
         transformer_max_length=conf.Models.WorldModel.TransformerMaxLength,
         transformer_hidden_dim=conf.Models.WorldModel.TransformerHiddenDim,
         transformer_num_layers=conf.Models.WorldModel.TransformerNumLayers,
         transformer_num_heads=conf.Models.WorldModel.TransformerNumHeads,
-    )  # .cuda()
-    d = get_state_dict(w)
-    for k in d:
-        # print(k)
-        # for s in d[k].shape:
-        #     print(s, type(s))
-        # d[k].requires_grad = True
-        d[k] = d[k].realize()
-    # for p in get_parameters(w):
-    #     # temp = tuple(int(x) for x in p.shape)
-    #     # p = p.reshape(temp)
-    #     print(p.dtype, p.shape, p.device)
-    #     for s in p.shape:
-    #         print(s, type(s))
-    #     # p.assign(p.float())#(dtypes.float32)
-    #     p.realize()
-    # for p in get_parameters(w): print(p.dtype, p.shape, p.device)
-    return w
+    )
 
 
 def build_agent(conf, action_dim):
-    a = agents.ActorCriticAgent(
+    return agents.ActorCriticAgent(
         feat_dim=32 * 32 + conf.Models.WorldModel.TransformerHiddenDim,
         num_layers=conf.Models.Agent.NumLayers,
         hidden_dim=conf.Models.Agent.HiddenDim,
@@ -334,16 +320,6 @@ def build_agent(conf, action_dim):
         lambd=conf.Models.Agent.Lambda,
         entropy_coef=conf.Models.Agent.EntropyCoef,
     )  # .cuda()
-    d = get_state_dict(a)
-    for k in d:
-        # print(k)
-        # for s in d[k].shape:
-        #     print(s, type(s))
-        # d[k].requires_grad = True
-        d[k] = d[k].realize()
-    # for p in get_parameters(w): p.realize()
-    # for p in get_parameters(a): print(p.dtype, p.shape, p.device)
-    return a
 
 
 if __name__ == "__main__":
