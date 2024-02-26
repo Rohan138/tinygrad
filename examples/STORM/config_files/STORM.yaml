@@ -4,7 +4,6 @@ BasicSettings:
   Seed: 0
   ImageSize: 64
   ReplayBufferOnGPU: True
-  UseAmp: True
 
 JointTrainAgent:
   SampleMaxSteps: 100000
@@ -22,9 +21,6 @@ JointTrainAgent:
   TrainAgentEverySteps: 1
   UseDemonstration: False
   SaveEverySteps: 2500
-  EvalEverySteps: 2500
-  EvalNumEnvs: 4
-  EvalNumEpisodes: 20
 
 Models:
   WorldModel:
