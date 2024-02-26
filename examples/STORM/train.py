@@ -5,13 +5,9 @@ import cv2
 import numpy as np
 from einops import rearrange
 
-import torch
+from line_profiler import profile
 
-# import torch.nn as nn
-# import torch.nn.functional as F
-
-from tinygrad import Tensor, dtypes, nn
-import tinygrad
+from tinygrad import Tensor
 from collections import deque
 from tqdm import tqdm
 
@@ -75,7 +71,6 @@ def train_world_model_step(
         logger.log(k, v)
 
 
-# @torch.no_grad()
 def world_model_imagine_data(
     replay_buffer: ReplayBuffer,
     world_model: WorldModel,
@@ -92,7 +87,6 @@ def world_model_imagine_data(
     """
     # world_model.eval()
     # agent.eval()
-
     sample_obs, sample_action, sample_reward, sample_termination = replay_buffer.sample(
         imagine_batch_size, imagine_demonstration_batch_size, imagine_context_length
     )
@@ -105,9 +99,17 @@ def world_model_imagine_data(
         log_video=log_video,
         logger=logger,
     )
-    return latent, action, None, None, reward_hat, termination_hat
+    return (
+        latent.detach(),
+        action.detach(),
+        None,
+        None,
+        reward_hat.detach(),
+        termination_hat.detach(),
+    )
 
 
+@profile
 def joint_train_world_model_agent(
     env_name,
     max_steps,
@@ -271,12 +273,6 @@ def joint_train_world_model_agent(
                 log_video=log_video,
                 logger=logger,
             )
-
-            # detach all inputs
-            imagine_latent = imagine_latent.detach()
-            agent_action = agent_action.detach()
-            imagine_reward = imagine_reward.detach()
-            imagine_termination = imagine_termination.detach()
 
             metrics = agent.update(
                 latent=imagine_latent,
