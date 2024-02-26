@@ -151,7 +151,7 @@ class ActorCriticAgent:
         for slow_param, param in zip(
             get_parameters(self.slow_critic), get_parameters(self.critic)
         ):
-            slow_param.assign(decay * slow_param + (1 - decay) * param).realize()
+            slow_param.assign(decay * slow_param + (1 - decay) * param.detach()).realize()
 
     def policy(self, x):
         # logits = self.actor(x)
