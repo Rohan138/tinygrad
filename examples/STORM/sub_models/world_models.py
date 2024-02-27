@@ -377,7 +377,7 @@ class WorldModel:
         self.categorical_kl_div_loss = CategoricalKLDivLossWithFreeBits(free_bits=1)
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
         for p in self.parameters():
-            p.assign(p.half().realize())
+            p.assign(p.cast(self.tensor_dtype).realize())
         self.optimizer = nn.optim.Adam(self.parameters(), lr=1e-4)
         # self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
 

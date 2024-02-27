@@ -133,7 +133,7 @@ class ActorCriticAgent:
         # ])
         self.critic = critic
         for p in self.parameters():
-            p.assign(p.half().realize())
+            p.assign(p.cast(self.tensor_dtype).realize())
         self.slow_critic = copy.deepcopy(self.critic)
 
         self.lowerbound_ema = EMAScalar(decay=0.99)
