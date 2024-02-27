@@ -83,7 +83,7 @@ class ActorCriticAgent:
         self.gamma = gamma
         self.lambd = lambd
         self.entropy_coef = entropy_coef
-        self.use_amp = True
+        self.use_amp = False
         # self.tensor_dtype = torch.float16 if self.use_amp else torch.float32
         self.tensor_dtype = dtypes.bfloat16 if self.use_amp else dtypes.float32
 

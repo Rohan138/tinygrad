@@ -322,7 +322,7 @@ class WorldModel:
         self.final_feature_width = 4
         self.stoch_dim = 32
         self.stoch_flattened_dim = self.stoch_dim * self.stoch_dim
-        self.use_amp = True
+        self.use_amp = False
         self.tensor_dtype = dtypes.bfloat16 if self.use_amp else dtypes.float32
         self.imagine_batch_size = -1
         self.imagine_batch_length = -1
@@ -376,7 +376,7 @@ class WorldModel:
         self.categorical_kl_div_loss = CategoricalKLDivLossWithFreeBits(free_bits=1)
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
         for p in self.parameters():
-            p.assign(p.cast(self.tensor_dtype).realize())
+            p.assign(p.cast(self.tensor_dtype)).realize()
         self.optimizer = nn.optim.Adam(self.parameters(), lr=1e-4)
         # self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
 
