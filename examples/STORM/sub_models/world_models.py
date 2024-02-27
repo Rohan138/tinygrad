@@ -535,7 +535,7 @@ class WorldModel:
             termination_hat_buffer,
         )
 
-    @TinyJit
+    # @TinyJit
     def update(self, obs, action, reward, termination):
         batch_size, batch_length = obs.shape[:2]
 

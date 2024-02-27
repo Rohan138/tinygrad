@@ -3,7 +3,7 @@ Task: "JointTrainAgent"
 BasicSettings:
   Seed: 0
   ImageSize: 64
-  ReplayBufferOnGPU: False
+  ReplayBufferOnGPU: True
 
 JointTrainAgent:
   SampleMaxSteps: 100000
@@ -26,13 +26,13 @@ Models:
   WorldModel:
     InChannels: 3
     TransformerMaxLength: 64
-    TransformerHiddenDim: 256
-    TransformerNumLayers: 1
+    TransformerHiddenDim: 512
+    TransformerNumLayers: 2
     TransformerNumHeads: 8
 
   Agent:
-    NumLayers: 1
-    HiddenDim: 256
+    NumLayers: 2
+    HiddenDim: 512
     Gamma: 0.985
     Lambda: 0.95
     EntropyCoef: 3E-4

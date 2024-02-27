@@ -200,12 +200,11 @@ class ActorCriticAgent:
         action = self.sample(latent, greedy)
         return action.detach().squeeze(-1).numpy()
 
-    @TinyJit
+    # @TinyJit
     def update(self, latent, action, reward, termination):
         """
         Update policy and value model
         """
-        breakpoint()
         latent = latent.cast(self.tensor_dtype)
         action = action.cast(self.tensor_dtype)
         reward = reward.cast(self.tensor_dtype)
