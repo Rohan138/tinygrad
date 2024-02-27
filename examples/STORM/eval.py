@@ -1,34 +1,18 @@
 import gymnasium
 import argparse
-from tensorboardX import SummaryWriter
 import cv2
 import numpy as np
-from einops import rearrange
-import torch
 
-# import torch.nn as nn
-# import torch.nn.functional as F
-
-from tinygrad import Tensor, dtypes, nn
-import tinygrad
+from tinygrad import Tensor, nn, TinyJit
 from collections import deque
 from tqdm import tqdm
 
-# import copy
 import colorama
 
-# import random
-# import json
-# import shutil
-# import pickle
-# import os
-
-from utils import Logger, load_config, seed_np  # , seed_np_torch
-from replay_buffer import ReplayBuffer
+from utils import load_config, seed_np
 import env_wrapper
-import agents
-from sub_models.functions_losses import symexp
-from sub_models.world_models import WorldModel, MSELoss
+from sub_models.world_models import WorldModel
+from agents import ActorCriticAgent
 
 
 def process_visualize(img):
@@ -57,6 +41,16 @@ def build_vec_env(env_name, image_size, num_envs):
     vec_env = gymnasium.vector.AsyncVectorEnv(env_fns=env_fns)
     return vec_env
 
+def get_action(context_obs: Tensor, context_action: Tensor):
+    context_latent = world_model.encode_obs(context_obs)
+    prior_flattened_sample, last_dist_feat = world_model.calc_last_dist_feat(
+        context_latent, context_action
+    )
+    action = agent.sample_as_env_action(
+        Tensor.cat(*[prior_flattened_sample, last_dist_feat], dim=-1),
+        greedy=False,
+    )
+    return action
 
 def eval_episodes(
     num_episode,
@@ -65,10 +59,8 @@ def eval_episodes(
     num_envs,
     image_size,
     world_model: WorldModel,
-    agent: agents.ActorCriticAgent,
+    agent: ActorCriticAgent,
 ):
-    world_model.eval()
-    agent.eval()
     vec_env = build_vec_env(env_name, image_size, num_envs=num_envs)
     print(
         "Current env: "
@@ -90,24 +82,11 @@ def eval_episodes(
             action = vec_env.action_space.sample()
         else:
             # context_latent = world_model.encode_obs(torch.cat(list(context_obs), dim=1))
-            context_latent = world_model.encode_obs(
-                Tensor.cat(list(context_obs), dim=1)
-            )
-            model_context_action = np.stack(list(context_action), axis=1)
-            # model_context_action = torch.Tensor(model_context_action).cuda()
-            model_context_action = Tensor(model_context_action)
-            prior_flattened_sample, last_dist_feat = world_model.calc_last_dist_feat(
-                context_latent, model_context_action
-            )
-            action = agent.sample_as_env_action(
-                # torch.cat([prior_flattened_sample, last_dist_feat], dim=-1),
-                Tensor.cat([prior_flattened_sample, last_dist_feat], dim=-1),
-                greedy=False,
-            )
+            model_context_obs = Tensor.cat(*list(context_obs), dim=1)
+            model_context_action = Tensor(list(context_action)).transpose()
+            action = get_action(model_context_obs, model_context_action)
 
-        context_obs.append(
-            rearrange(torch.Tensor(current_obs).cuda(), "B H W C -> B 1 C H W") / 255
-        )
+        context_obs.append(Tensor(current_obs).permute(0, 3, 1, 2).unsqueeze(1) / 255)
         context_action.append(action)
 
         obs, reward, done, truncated, info = vec_env.step(action)
@@ -127,6 +106,7 @@ def eval_episodes(
                             + f"{np.mean(final_rewards)}"
                             + colorama.Style.RESET_ALL
                         )
+                        vec_env.close()
                         return np.mean(final_rewards)
 
         # update current_obs, current_info and sum_reward
@@ -141,8 +121,6 @@ if __name__ == "__main__":
     import warnings
 
     warnings.filterwarnings("ignore")
-    # torch.backends.cuda.matmul.allow_tf32 = True
-    # torch.backends.cudnn.allow_tf32 = True
 
     # parse arguments
     parser = argparse.ArgumentParser()
@@ -163,23 +141,26 @@ if __name__ == "__main__":
     dummy_env = build_single_env(args.env_name, conf.BasicSettings.ImageSize)
     action_dim = dummy_env.action_space.n
     world_model = train.build_world_model(conf, action_dim)
-    agent = train.build_agnet(conf, action_dim)
+    agent = train.build_agent(conf, action_dim)
     root_path = f"ckpt/{args.run_name}"
 
     import glob
 
-    pathes = glob.glob(f"{root_path}/world_model_*.pth")
+    pathes = glob.glob(f"{root_path}/world_model_*.safetensors")
     steps = [int(path.split("_")[-1].split(".")[0]) for path in pathes]
     steps.sort()
-    steps = steps[-1:]
+    # steps = steps[-1:]
     print(steps)
     results = []
     for step in tqdm(steps):
-        world_model.load_state_dict(torch.load(f"{root_path}/world_model_{step}.pth"))
-        agent.load_state_dict(torch.load(f"{root_path}/agent_{step}.pth"))
+        state_dict = nn.state.safe_load(f"{root_path}/world_model_{step}.safetensors")
+        nn.state.load_state_dict(world_model, state_dict)
+        state_dict = nn.state.safe_load(f"{root_path}/agent_{step}.safetensors")
+        nn.state.load_state_dict(agent, state_dict)
         # # eval
+        Tensor.no_grad = True
         episode_avg_return = eval_episodes(
-            num_episode=20,
+            num_episode=5,
             env_name=args.env_name,
             num_envs=5,
             max_steps=conf.JointTrainAgent.SampleMaxSteps,
@@ -187,8 +168,5 @@ if __name__ == "__main__":
             world_model=world_model,
             agent=agent,
         )
+        Tensor.no_grad = False
         results.append([step, episode_avg_return])
-    with open(f"eval_result/{args.run_name}.csv", "w") as fout:
-        fout.write("step, episode_avg_return\n")
-        for step, episode_avg_return in results:
-            fout.write(f"{step},{episode_avg_return}\n")

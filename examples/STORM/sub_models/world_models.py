@@ -376,6 +376,8 @@ class WorldModel:
         )
         self.categorical_kl_div_loss = CategoricalKLDivLossWithFreeBits(free_bits=1)
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
+        for p in self.parameters():
+            p.assign(p.half().realize())
         self.optimizer = nn.optim.Adam(self.parameters(), lr=1e-4)
         # self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
 
@@ -391,7 +393,6 @@ class WorldModel:
         return get_parameters(models)
 
     def encode_obs(self, obs):
-        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
         embedding = self.encoder(obs)
         post_logits = self.dist_head.forward_post(embedding)
         sample = self.stright_throught_gradient(
@@ -401,7 +402,6 @@ class WorldModel:
         return flattened_sample
 
     def calc_last_dist_feat(self, latent, action):
-        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
         temporal_mask = get_subsequent_mask(latent)
         dist_feat = self.storm_transformer(latent, action, temporal_mask)
         last_dist_feat = dist_feat[:, -1:]

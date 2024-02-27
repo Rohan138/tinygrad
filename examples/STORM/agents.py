@@ -132,6 +132,8 @@ class ActorCriticAgent:
         #     # nn.Linear(hidden_dim, 255)
         # ])
         self.critic = critic
+        for p in self.parameters():
+            p.assign(p.half().realize())
         self.slow_critic = copy.deepcopy(self.critic)
 
         self.lowerbound_ema = EMAScalar(decay=0.99)
@@ -191,8 +193,7 @@ class ActorCriticAgent:
 
     def sample_as_env_action(self, latent, greedy=False):
         action = self.sample(latent, greedy)
-        # return action.detach().cpu().squeeze(-1).numpy()
-        return action.detach().numpy()
+        return action.detach().squeeze(-1).numpy()
 
     @TinyJit
     def update(self, latent, action, reward, termination):
