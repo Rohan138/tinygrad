@@ -41,6 +41,7 @@ def build_vec_env(env_name, image_size, num_envs):
     vec_env = gymnasium.vector.AsyncVectorEnv(env_fns=env_fns)
     return vec_env
 
+
 def get_action(context_obs: Tensor, context_action: Tensor):
     context_latent = world_model.encode_obs(context_obs)
     prior_flattened_sample, last_dist_feat = world_model.calc_last_dist_feat(
@@ -51,6 +52,7 @@ def get_action(context_obs: Tensor, context_action: Tensor):
         greedy=False,
     )
     return action
+
 
 def eval_episodes(
     num_episode,

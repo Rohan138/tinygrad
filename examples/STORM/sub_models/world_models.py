@@ -322,7 +322,7 @@ class WorldModel:
         self.final_feature_width = 4
         self.stoch_dim = 32
         self.stoch_flattened_dim = self.stoch_dim * self.stoch_dim
-        self.use_amp = False
+        self.use_amp = True
         # self.tensor_dtype = torch.bfloat16 if self.use_amp else torch.float32
         self.tensor_dtype = dtypes.bfloat16 if self.use_amp else dtypes.float32
         self.imagine_batch_size = -1
@@ -413,7 +413,9 @@ class WorldModel:
         return prior_flattened_sample, last_dist_feat
 
     def predict_next(self, last_flattened_sample, action, log_video=True):
-        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
+        last_flattened_sample = last_flattened_sample.cast(self.tensor_dtype)
+        action = action.cast(self.tensor_dtype)
+
         dist_feat = self.storm_transformer.forward_with_kv_cache(
             last_flattened_sample, action
         )
@@ -535,10 +537,13 @@ class WorldModel:
 
     @TinyJit
     def update(self, obs, action, reward, termination):
-        # self.train()
         batch_size, batch_length = obs.shape[:2]
 
-        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
+        obs = obs.cast(self.tensor_dtype)
+        action = action.cast(self.tensor_dtype)
+        reward = reward.cast(self.tensor_dtype)
+        termination = termination.cast(self.tensor_dtype)
+
         # encoding
         embedding = self.encoder(obs)
         post_logits = self.dist_head.forward_post(embedding)

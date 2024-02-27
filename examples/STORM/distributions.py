@@ -345,8 +345,7 @@ class Normal(Distribution):
 
     def log_prob(self, event):
         return -(
-            Tensor.sqrt((event - self._loc) ** 2 + self._threshold**2)
-            - self._threshold
+            Tensor.sqrt((event - self._loc) ** 2 + self._threshold**2) - self._threshold
         )
 
 

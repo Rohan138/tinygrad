@@ -295,8 +295,14 @@ def joint_train_world_model_agent(
             # torch.save(world_model.state_dict(), f"ckpt/{args.n}/world_model_{total_steps}.pth")
             # torch.save(agent.state_dict(), f"ckpt/{args.n}/agent_{total_steps}.pth")
 
-            nn.state.safe_save(nn.state.get_state_dict(world_model), f"ckpt/{args.n}/world_model_{total_steps}.safetensors")
-            nn.state.safe_save(nn.state.get_state_dict(agent), f"ckpt/{args.n}/agent_{total_steps}.safetensors")
+            nn.state.safe_save(
+                nn.state.get_state_dict(world_model),
+                f"ckpt/{args.n}/world_model_{total_steps}.safetensors",
+            )
+            nn.state.safe_save(
+                nn.state.get_state_dict(agent),
+                f"ckpt/{args.n}/agent_{total_steps}.safetensors",
+            )
 
 
 def build_world_model(conf, action_dim):
@@ -392,14 +398,18 @@ if __name__ == "__main__":
             train_dynamics_every_steps=conf.JointTrainAgent.TrainDynamicsEverySteps,
             train_agent_every_steps=conf.JointTrainAgent.TrainAgentEverySteps,
             batch_size=conf.JointTrainAgent.BatchSize,
-            demonstration_batch_size=conf.JointTrainAgent.DemonstrationBatchSize
-            if conf.JointTrainAgent.UseDemonstration
-            else 0,
+            demonstration_batch_size=(
+                conf.JointTrainAgent.DemonstrationBatchSize
+                if conf.JointTrainAgent.UseDemonstration
+                else 0
+            ),
             batch_length=conf.JointTrainAgent.BatchLength,
             imagine_batch_size=conf.JointTrainAgent.ImagineBatchSize,
-            imagine_demonstration_batch_size=conf.JointTrainAgent.ImagineDemonstrationBatchSize
-            if conf.JointTrainAgent.UseDemonstration
-            else 0,
+            imagine_demonstration_batch_size=(
+                conf.JointTrainAgent.ImagineDemonstrationBatchSize
+                if conf.JointTrainAgent.UseDemonstration
+                else 0
+            ),
             imagine_context_length=conf.JointTrainAgent.ImagineContextLength,
             imagine_batch_length=conf.JointTrainAgent.ImagineBatchLength,
             save_every_steps=conf.JointTrainAgent.SaveEverySteps,

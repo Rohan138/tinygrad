@@ -83,7 +83,7 @@ class ActorCriticAgent:
         self.gamma = gamma
         self.lambd = lambd
         self.entropy_coef = entropy_coef
-        self.use_amp = False
+        self.use_amp = True
         # self.tensor_dtype = torch.bfloat16 if self.use_amp else torch.float32
         self.tensor_dtype = dtypes.bfloat16 if self.use_amp else dtypes.float32
 
@@ -153,7 +153,9 @@ class ActorCriticAgent:
         for slow_param, param in zip(
             get_parameters(self.slow_critic), get_parameters(self.critic)
         ):
-            slow_param.assign(decay * slow_param + (1 - decay) * param.detach()).realize()
+            slow_param.assign(
+                decay * slow_param + (1 - decay) * param.detach()
+            ).realize()
 
     def policy(self, x):
         # logits = self.actor(x)
@@ -182,7 +184,7 @@ class ActorCriticAgent:
     # @torch.no_grad()
     def sample(self, latent, greedy=False):
         # self.eval()
-        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
+        latent = latent.cast(self.tensor_dtype)
         logits = self.policy(latent)
         dist = distributions.Categorical(logits=logits)
         if greedy:
@@ -200,8 +202,10 @@ class ActorCriticAgent:
         """
         Update policy and value model
         """
-        # self.train()
-        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
+        latent = latent.cast(self.tensor_dtype)
+        action = action.cast(self.tensor_dtype)
+        reward = reward.cast(self.tensor_dtype)
+        termination = termination.cast(self.tensor_dtype)
 
         logits, raw_value = self.get_logits_raw_value(latent)
         dist = distributions.Categorical(logits=logits[:, :-1])
