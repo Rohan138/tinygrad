@@ -156,8 +156,12 @@ if __name__ == "__main__":
     results = []
     for step in tqdm(steps):
         state_dict = nn.state.safe_load(f"{root_path}/world_model_{step}.safetensors")
+        for k, v in state_dict:
+            state_dict[k] = v.cast(world_model.tensor_dtype).realize()
         nn.state.load_state_dict(world_model, state_dict)
         state_dict = nn.state.safe_load(f"{root_path}/agent_{step}.safetensors")
+        for k, v in state_dict:
+            state_dict[k] = v.cast(world_model.tensor_dtype).realize()
         nn.state.load_state_dict(agent, state_dict)
         # # eval
         Tensor.no_grad = True

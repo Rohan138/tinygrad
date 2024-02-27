@@ -4,7 +4,7 @@ import numpy as np
 
 from line_profiler import profile
 
-from tinygrad import Tensor, nn
+from tinygrad import Tensor, nn, dtypes
 from collections import deque
 from tqdm import tqdm
 
@@ -63,7 +63,7 @@ def train_world_model_step(
     )
     # print(obs.shape, action.shape, reward.shape, termination.shape)
     metrics = world_model.update(obs, action, reward, termination)
-    metrics = {k: v.item() for k, v in metrics.items()}
+    metrics = {k: v.numpy().item() for k, v in metrics.items()}
     for k, v in metrics.items():
         logger.log(k, v)
 
@@ -280,7 +280,7 @@ def joint_train_world_model_agent(
                 reward=imagine_reward,
                 termination=imagine_termination,
             )
-            metrics = {k: v.item() for k, v in metrics.items()}
+            metrics = {k: v.numpy().item() for k, v in metrics.items()}
             for k, v in metrics.items():
                 logger.log(k, v)
         # <<< train agent part
@@ -292,15 +292,19 @@ def joint_train_world_model_agent(
                 + f"Saving model at total steps {total_steps}"
                 + colorama.Style.RESET_ALL
             )
-            # torch.save(world_model.state_dict(), f"ckpt/{args.n}/world_model_{total_steps}.pth")
-            # torch.save(agent.state_dict(), f"ckpt/{args.n}/agent_{total_steps}.pth")
 
+            state_dict = nn.state.get_state_dict(world_model)
+            for k, v in state_dict.items():
+                state_dict[k] = v.cast(dtypes.float).realize()
             nn.state.safe_save(
-                nn.state.get_state_dict(world_model),
+                state_dict,
                 f"ckpt/{args.n}/world_model_{total_steps}.safetensors",
             )
+            state_dict = nn.state.get_state_dict(agent)
+            for k, v in state_dict.items():
+                state_dict[k] = v.cast(dtypes.float).realize()
             nn.state.safe_save(
-                nn.state.get_state_dict(agent),
+                state_dict,
                 f"ckpt/{args.n}/agent_{total_steps}.safetensors",
             )
 

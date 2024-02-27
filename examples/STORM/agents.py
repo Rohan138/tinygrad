@@ -83,9 +83,9 @@ class ActorCriticAgent:
         self.gamma = gamma
         self.lambd = lambd
         self.entropy_coef = entropy_coef
-        self.use_amp = True
-        # self.tensor_dtype = torch.bfloat16 if self.use_amp else torch.float32
-        self.tensor_dtype = dtypes.bfloat16 if self.use_amp else dtypes.float32
+        self.use_amp = False
+        # self.tensor_dtype = torch.float16 if self.use_amp else torch.float32
+        self.tensor_dtype = dtypes.float16 if self.use_amp else dtypes.float32
 
         self.symlog_twohot_loss = SymLogTwoHotLoss(255, -20, 20)
 
@@ -132,9 +132,13 @@ class ActorCriticAgent:
         #     # nn.Linear(hidden_dim, 255)
         # ])
         self.critic = critic
+        self.slow_critic = copy.deepcopy(self.critic)
+
         for p in self.parameters():
             p.assign(p.cast(self.tensor_dtype).realize())
-        self.slow_critic = copy.deepcopy(self.critic)
+
+        for p in get_parameters(self.slow_critic):
+            p.assign(p.cast(self.tensor_dtype).realize())
 
         self.lowerbound_ema = EMAScalar(decay=0.99)
         self.upperbound_ema = EMAScalar(decay=0.99)
@@ -183,7 +187,6 @@ class ActorCriticAgent:
 
     # @torch.no_grad()
     def sample(self, latent, greedy=False):
-        # self.eval()
         latent = latent.cast(self.tensor_dtype)
         logits = self.policy(latent)
         dist = distributions.Categorical(logits=logits)
@@ -202,6 +205,7 @@ class ActorCriticAgent:
         """
         Update policy and value model
         """
+        breakpoint()
         latent = latent.cast(self.tensor_dtype)
         action = action.cast(self.tensor_dtype)
         reward = reward.cast(self.tensor_dtype)

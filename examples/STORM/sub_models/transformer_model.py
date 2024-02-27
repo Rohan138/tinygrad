@@ -43,7 +43,7 @@ class StochasticTransformer:
         self.stem = [
             nn.Linear(stoch_dim + action_dim, feat_dim, bias=False),
             nn.LayerNorm(feat_dim),
-            Tensor.relu(),
+            Tensor.relu,
             nn.Linear(feat_dim, feat_dim, bias=False),
             nn.LayerNorm(feat_dim),
         ]
