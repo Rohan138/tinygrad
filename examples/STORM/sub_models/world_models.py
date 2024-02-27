@@ -322,9 +322,8 @@ class WorldModel:
         self.final_feature_width = 4
         self.stoch_dim = 32
         self.stoch_flattened_dim = self.stoch_dim * self.stoch_dim
-        self.use_amp = False
-        # self.tensor_dtype = torch.float16 if self.use_amp else torch.float32
-        self.tensor_dtype = dtypes.float16 if self.use_amp else dtypes.float32
+        self.use_amp = True
+        self.tensor_dtype = dtypes.bfloat16 if self.use_amp else dtypes.float32
         self.imagine_batch_size = -1
         self.imagine_batch_length = -1
 
