@@ -157,9 +157,8 @@ class ActorCriticAgent:
         for slow_param, param in zip(
             get_parameters(self.slow_critic), get_parameters(self.critic)
         ):
-            slow_param.assign(
-                decay * slow_param + (1 - decay) * param.detach()
-            ).realize()
+            updated_param = decay * slow_param + (1 - decay) * param.detach()
+            slow_param.assign(updated_param.realize())
 
     def policy(self, x):
         # logits = self.actor(x)
@@ -200,7 +199,7 @@ class ActorCriticAgent:
         action = self.sample(latent, greedy)
         return action.detach().squeeze(-1).numpy()
 
-    # @TinyJit
+    @TinyJit
     def update(self, latent, action, reward, termination):
         """
         Update policy and value model

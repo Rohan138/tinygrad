@@ -112,9 +112,8 @@ class EMAScalar:
         return self.get()
 
     def update(self, value):
-        self.scalar.assign(
-            self.scalar * self.decay + value * (1 - self.decay)
-        ).realize()
+        updated = self.scalar * self.decay + value * (1 - self.decay)
+        self.scalar.assign(updated.realize())
 
     def get(self):
         return self.scalar
