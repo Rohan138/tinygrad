@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Dict, Tuple, ClassVar
 import importlib, inspect, functools, pathlib, time, ctypes
 from tinygrad.dtype import DType, ImageDType
 from tinygrad.helpers import ansilen, DEBUG, getenv, colored, BEAM, NOOPT, all_int, to_function_name, from_mv, flat_mv, diskcache_get, diskcache_put
+from tinygrad.helpers import prod
 from tinygrad.shape.symbolic import Variable, sym_infer, sint
 from tinygrad.ops import LazyOp, get_lazyop_info, GlobalCounters
 from dataclasses import dataclass
@@ -39,7 +40,9 @@ Device = _Device()
 # **************** base Runner + helpers ****************
 
 class JITRunner:
-  def __init__(self): self.op_estimate, self.mem_estimate = 0, 0
+  def __init__(self):
+    self.op_estimate:sint = 0
+    self.mem_estimate:sint = 0
   def exec(self, rawbufs:List[Buffer], var_vals:Optional[Dict[Variable, int]]=None) -> Optional[float]:
     var_vals = var_vals if var_vals is not None else {}
     from tinygrad.features.jit import CacheCollector
@@ -49,9 +52,10 @@ class JITRunner:
   def __call__(self, rawbufs:List[Buffer], var_vals:Dict[Variable, int], wait=False, jit=False) -> Optional[float]:
     raise NotImplementedError("override this")
 
-def update_stats(name:str, op_estimate:sint, mem_estimate:int, var_vals: Optional[Dict[Variable, int]], et: Optional[float], buf_count:int, jit=False, num_kernels=1, lra: Optional[Dict]=None, device:str="", first_run=False):  # noqa: E501
+def update_stats(name:str, op_estimate:sint, mem_estimate:sint, var_vals: Optional[Dict[Variable, int]], et: Optional[float], buf_count:int, jit=False, num_kernels=1, lra: Optional[Dict]=None, device:str="", first_run=False):  # noqa: E501
   if var_vals is None: var_vals = {}
   op_estimate = sym_infer(op_estimate, var_vals)
+  mem_estimate = sym_infer(mem_estimate, var_vals)
   GlobalCounters.kernel_count += num_kernels
   GlobalCounters.global_ops += op_estimate
   GlobalCounters.global_mem += mem_estimate
@@ -183,7 +187,8 @@ class Compiler:
     return lib
 
 class CompiledASTRunner(JITRunner):
-  def __init__(self, ast:Optional[LazyOp], name:str, prg:str, device:Compiled, global_size:Optional[List[int]]=None, local_size:Optional[List[int]]=None, precompiled:Optional[bytes]=None):  # noqa: E501
+  def __init__(self, name:str, prg:str, device:Compiled, global_size:Optional[List[int]]=None, local_size:Optional[List[int]]=None,
+               variables:Optional[List[Variable]]=None, op_estimate:sint=0, mem_estimate:sint=0, precompiled:Optional[bytes]=None):
     super().__init__()
     if DEBUG >= 4: print(prg)
     if global_size is not None: global_size = global_size + [1]*(3-len(global_size))
@@ -193,12 +198,8 @@ class CompiledASTRunner(JITRunner):
     assert self.device.compiler is not None, "compiler is reuired to make an AST kernel"
     lib:bytes = precompiled if precompiled is not None else self.device.compiler.compile_cached(prg)
     self.lib, self.clprg = lib, self.device.runtime(self.name, lib)
-    self.vars: List[Variable] = []
-    if ast:
-      info = get_lazyop_info(ast)
-      self.op_estimate, self.mem_estimate = info.flops, info.mem_estimate
-      self.vars = ast.vars()
-      assert all(v._val is None for v in self.vars), f"ASTRunner contains bound Variable {self.vars}"
+    self.vars: List[Variable] = [] if variables is None else variables
+    self.op_estimate, self.mem_estimate = op_estimate, mem_estimate
 
   def launch_dims(self, var_vals):
     global_size = [sym_infer(sz, var_vals) for sz in self.global_size] if self.global_size is not None else self.global_size
@@ -221,6 +222,10 @@ class CompiledASTRunner(JITRunner):
     self.first_run = False
     return et
 
+class MultiDeviceJITGraph(JITRunner):
+  def __call__(self, rawbufs:List[Buffer], var_vals:Dict[Variable, int], wait=False, jit=False) -> Optional[float]:
+    raise NotImplementedError("override this")
+
 class Compiled:
   def __init__(self, device:str, allocator:Allocator, compiler:Optional[Compiler], runtime, graph=None):
     self.dname, self.allocator, self.compiler, self.runtime, self.graph = device, allocator, compiler, runtime, graph
@@ -229,7 +234,13 @@ class Compiled:
   def to_program(self, k:Linearizer) -> CompiledASTRunner:
     assert self.compiler is not None, "compiler is required to run AST"
     k.linearize()
-    return CompiledASTRunner(k.ast, k.name, self.compiler.render(to_function_name(k.name), k.uops), self, k.global_size, k.local_size)
+    info = get_lazyop_info(k.ast)
+    ops, mem = k.uops.flops_mem()
+    run_count = prod((k.global_size if k.global_size else []) + (k.local_size if k.local_size else []))
+    # NOTE: we use min here to ignore the indexing FLOPS
+    ret = CompiledASTRunner(k.name, self.compiler.render(to_function_name(k.name), k.uops), self, k.global_size, k.local_size,
+                            k.uops.vars(), min(info.flops, ops * run_count), min(info.mem_estimate, mem * run_count))
+    return ret
 
   def get_linearizer(self, ast:LazyOp) -> Linearizer:
     assert self.compiler is not None, "compiler is required to build AST"

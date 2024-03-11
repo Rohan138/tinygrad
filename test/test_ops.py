@@ -114,17 +114,20 @@ class TestOps(unittest.TestCase):
     helper_test_op([], lambda: torch.eye(0), lambda: Tensor.eye(0), forward_only=True)
 
   def test_split(self):
+    def tensor(s): return torch.arange(math.prod(s)).reshape(s), Tensor.arange(math.prod(s)).reshape(s)
     test_cases = [
-      (torch.arange(10), Tensor.arange(10), 5),
-      (torch.arange(10), Tensor.arange(10), [1, 4, 5]),
-      (torch.arange(10), Tensor.arange(10), 3),
-      (torch.arange(12).reshape(3, 4), Tensor.arange(12).reshape(3, 4), 1),
-      (torch.arange(16).reshape(4, 4), Tensor.arange(16).reshape(4, 4), [2, 2]),
-      (torch.arange(10000), Tensor.arange(10000), 2500),
+      (tensor((10,)),       5, {}),
+      (tensor((10,)), [1,4,5], {}),
+      (tensor((10,)),       3, {}),
+      (tensor((3,4,)),      1, {}),
+      (tensor((3,4,)),      1, {'dim':1}),
+      (tensor((4,4,)),  [2,2], {}),
+      (tensor((4,4,)),  [2,2], {'dim':1}),
+      (tensor((10000,)), 2500, {}),
     ]
 
-    for tor, ten, sizes in test_cases:
-      tor_splits, ten_splits = tor.split(sizes), ten.split(sizes)
+    for (tor, ten), sizes, args in test_cases:
+      tor_splits, ten_splits = tor.split(sizes, **args), ten.split(sizes, **args)
       assert len(tor_splits) == len(ten_splits)
       for tor_chunk, ten_chunk in zip(tor_splits, ten_splits):
         helper_test_op([], lambda: tor_chunk, lambda: ten_chunk, forward_only=True)
@@ -348,12 +351,10 @@ class TestOps(unittest.TestCase):
     helper_test_op([()], lambda x: x/2)
     helper_test_op([()], lambda x: 2/x)
 
-  @unittest.skipIf(Device.DEFAULT in ["METAL", "WEBGPU"], "METAL has issues with -inf")
   def test_mul_naninf(self):
     helper_test_op([(45,65)], lambda x: x*math.inf)
     helper_test_op([(45,65)], lambda x: x*-math.inf)
     helper_test_op([(45,65)], lambda x: x*math.nan)
-  @unittest.skipIf(Device.DEFAULT in ["METAL", "WEBGPU"], "METAL has issues with -inf")
   def test_div_naninf(self):
     helper_test_op([(45,65)], lambda x: x/math.inf)
     helper_test_op([(45,65)], lambda x: x/-math.inf)
@@ -471,8 +472,7 @@ class TestOps(unittest.TestCase):
 
   def test_gelu(self):
     helper_test_op([(45,65)], lambda x: torch.nn.functional.gelu(x, approximate="tanh"), Tensor.gelu)
-    if not (CI and Device.DEFAULT == "METAL"):
-      helper_test_op([(45,65)], lambda x: torch.nn.functional.gelu(x, approximate="tanh"), Tensor.gelu, low=300, high=303)
+    helper_test_op([(45,65)], lambda x: torch.nn.functional.gelu(x, approximate="tanh"), Tensor.gelu, low=300, high=303)
     helper_test_op([(45,65)], lambda x: torch.nn.functional.gelu(x, approximate="tanh"), Tensor.gelu, low=-300, high=-297)
   def test_quick_gelu(self):
     helper_test_op([(45,65)], lambda x: x * torch.sigmoid(1.702 * x), Tensor.quick_gelu)
@@ -510,6 +510,10 @@ class TestOps(unittest.TestCase):
     helper_test_op([(20,30)], lambda x: torch.cumsum(x, dim=1), lambda x: Tensor.cumsum(x, axis=1))
     helper_test_op([(20,30,40)], lambda x: torch.cumsum(x, dim=2), lambda x: Tensor.cumsum(x, axis=2))
     helper_test_op([(20,30,40)], lambda x: torch.cumsum(x, dim=-1), lambda x: Tensor.cumsum(x, axis=-1))
+  def test_cumsum_zero_axis(self):
+    helper_test_op([(2,0,4)], lambda x: torch.cumsum(x, dim=1), lambda x: Tensor.cumsum(x, axis=1))
+    helper_test_op([(0,3)], lambda x: torch.cumsum(x, dim=0), lambda x: Tensor.cumsum(x, axis=0))
+    helper_test_op([(2,3,0)], lambda x: torch.cumsum(x, dim=2), lambda x: Tensor.cumsum(x, axis=2))
 
   def test_argmax(self):
     self.assertEqual(torch.tensor([2,2]).argmax().numpy(), Tensor([2,2]).argmax().numpy()) # check if returns first index for same max
@@ -745,10 +749,22 @@ class TestOps(unittest.TestCase):
     # exceed per kernel buffer limit with backward
     forward_only = (Device.DEFAULT == "WEBGPU")
     helper_test_op([(45,65)], torch.nn.Softmax(dim=1), Tensor.softmax, atol=1e-7, grad_atol=1e-7, forward_only=forward_only)
+    helper_test_op([(45)], torch.nn.Softmax(dim=0), Tensor.softmax, atol=1e-7, grad_atol=1e-7, forward_only=forward_only)
     helper_test_op([()], torch.nn.Softmax(dim=0), Tensor.softmax, atol=1e-7, grad_atol=1e-7, forward_only=forward_only)
+    helper_test_op([()], torch.nn.Softmax(dim=-1), Tensor.softmax, atol=1e-7, grad_atol=1e-7, forward_only=forward_only)
+  def test_softmax_other_axis(self):
+    helper_test_op([(10,10,10)], lambda x: x.softmax(0), atol=1e-7, grad_atol=1e-7)
+    helper_test_op([(10,10,10)], lambda x: x.softmax(1), atol=1e-7, grad_atol=1e-7)
+    helper_test_op([(10,10,10)], lambda x: x.softmax(2), atol=1e-7, grad_atol=1e-7)
+  @unittest.skipIf(CI and Device.DEFAULT in ["CLANG", "PYTHON"], "Broken ISSUE #3552")
+  def test_softmax_argmax(self):
+    helper_test_op([(45,65)], lambda x: x.softmax(0).argmax(), forward_only=True, atol=1e-7, grad_atol=1e-7)
+    helper_test_op([(45,65)], lambda x: x.softmax(1).argmax(), forward_only=True, atol=1e-7, grad_atol=1e-7)
   def test_log_softmax(self):
     helper_test_op([(45,65)], torch.nn.LogSoftmax(dim=1), Tensor.log_softmax, atol=1e-7, grad_atol=1e-7)
+    helper_test_op([(45)], torch.nn.LogSoftmax(dim=0), Tensor.log_softmax, atol=1e-7, grad_atol=1e-7)
     helper_test_op([()], torch.nn.LogSoftmax(dim=0), Tensor.log_softmax, atol=1e-7, grad_atol=1e-7)
+    helper_test_op([()], torch.nn.LogSoftmax(dim=-1), Tensor.log_softmax, atol=1e-7, grad_atol=1e-7)
   def test_log_softmax_other_axis(self):
     helper_test_op([(10,10,10)], lambda x: x.log_softmax(0), atol=1e-7, grad_atol=1e-7)
     helper_test_op([(10,10,10)], lambda x: x.log_softmax(1), atol=1e-7, grad_atol=1e-7)
@@ -1073,7 +1089,7 @@ class TestOps(unittest.TestCase):
 
   @unittest.skipIf(IMAGE>0, "no conv3d on images")
   def test_padded_conv3d(self):
-    helper_test_op([(1,4,9,9,9), (4,4,3,3,3)],
+    helper_test_op([(1,4,5,5,5), (4,4,3,3,3)],
       lambda x,w: torch.nn.functional.conv3d(x,w,padding=1).relu(),
       lambda x,w: Tensor.conv2d(x,w,padding=[1,1,1,1,1,1]).relu(), atol=1e-4, grad_rtol=1e-5)
 
@@ -1570,9 +1586,9 @@ class TestOps(unittest.TestCase):
     # tensors used as indices must be int tensors
     with self.assertRaises(IndexError): a[Tensor(1.1)]
     with self.assertRaises(IndexError): a[Tensor([True, True])]
-    # shape mismatch, cannot broadcast
-    with self.assertRaises(IndexError): a[Tensor.randint(3,1,1,1), Tensor.randint(1,4,1,1), Tensor.randint(2,4,4,1)]
-    with self.assertRaises(IndexError): a[Tensor.randint(3,1,1,1), Tensor.randint(1,4,1,1,1)]
+    # shape mismatch, cannot broadcast. either exception is okay
+    with self.assertRaises((IndexError, ValueError)): a[Tensor.randint(3,1,1,1), Tensor.randint(1,4,1,1), Tensor.randint(2,4,4,1)]
+    with self.assertRaises((IndexError, ValueError)): a[Tensor.randint(3,1,1,1), Tensor.randint(1,4,1,1,1)]
 
   def test_gather(self):
     # indices cannot have gradient
