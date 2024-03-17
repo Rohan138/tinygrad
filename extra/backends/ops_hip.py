@@ -7,11 +7,10 @@ from tinygrad.helpers import from_mv, round_up, to_mv, colored, init_c_struct_t
 from tinygrad.device import Compiled, LRUAllocator, BufferOptions, JITRunner, Device, Buffer, MallocAllocator, update_stats, Compiler
 from tinygrad.renderer.cstyle import HIPRenderer
 from tinygrad.codegen.kernel import LinearizerOptions
-from tinygrad.runtime.compiler.hip_comgr import compile_hip
-
+from tinygrad.runtime.driver.hip_comgr import compile_hip
 
 class HIPCompiler(Compiler):
-  linearizer_opts = LinearizerOptions("HIP", has_tensor_cores=True)
+  linearizer_opts = LinearizerOptions("HIP", has_tensor_cores=True, shared_max=65536)
   def __init__(self, arch:str):
     self.arch = arch
     super().__init__(f"compile_hip_{self.arch}")
@@ -126,7 +125,7 @@ class HIPAllocator(LRUAllocator):
     self.full_synchronize()
     hip_set_device(self.device.device)
     check(hip.hipMemcpy(from_mv(dest), src, len(dest), hip.hipMemcpyDeviceToHost))
-  def transfer(self, dest:T, src:T, sz:int):
+  def transfer(self, dest:T, src:T, sz:int, **kwargs):
     hip_set_device(self.device.device)
     check(hip.hipMemcpyAsync(dest, src, sz, hip.hipMemcpyDeviceToDevice, None))
 

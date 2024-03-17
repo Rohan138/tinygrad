@@ -15,7 +15,7 @@ setup(name='tinygrad',
       long_description=long_description,
       long_description_content_type='text/markdown',
       packages = ['tinygrad', 'tinygrad.runtime.autogen', 'tinygrad.codegen', 'tinygrad.nn', 'tinygrad.renderer',
-                  'tinygrad.runtime', 'tinygrad.runtime.compiler', 'tinygrad.runtime.graph', 'tinygrad.shape', 'tinygrad.features'],
+                  'tinygrad.runtime', 'tinygrad.runtime.driver', 'tinygrad.runtime.graph', 'tinygrad.shape', 'tinygrad.features'],
       classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License"
@@ -52,8 +52,10 @@ setup(name='tinygrad',
             "librosa",
             "networkx",
             "hypothesis",
-            "protobuf==3.20.3",
-            "gguf",
+        ],
+        'testing_tf': [
+            "tensorflow",
+            "tensorflow_addons",
         ]
       },
       include_package_data=True)

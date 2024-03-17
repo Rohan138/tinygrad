@@ -7,7 +7,7 @@ from extra.onnx import safe_numpy, DTYPE_MAP
 import numpy as np
 
 tensor_methods = {"Neg", "Reciprocal", "Pow", "Sqrt", "Sign", "Abs", "Exp", "Log", "Mish", "Sin", "Cos", "Tan", "Relu", "Sigmoid", "MatMul",
-                  "Floor", "Ceil", "Softplus", "HardSwish", "Where", "Mul", "Div", "Sinh", "Cosh", "Tanh", "Softsign", "Asinh", "Acosh", "Atanh",
+                  "Floor", "Ceil", "Softplus", "HardSwish", "Where", "Mul", "Sinh", "Cosh", "Tanh", "Softsign", "Asinh", "Acosh", "Atanh",
                   "Elu", "Celu", "Xor", "Round"}
 
 # **************** Free Ops ****************
@@ -30,6 +30,9 @@ def Cast(x: Tensor, to: int, saturate=1): return x.cast(DTYPE_MAP[to])
 def CastLike(x: Tensor, target_type: Tensor, saturate=1): return x.cast(target_type.dtype)
 
 # **************** Simple Ops ****************
+
+# https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_div.py
+def Div(x: Tensor, other: Tensor): return (x/other).cast(x.dtype)
 
 def Constant(value: Tensor=None, value_float=None, value_floats=None, value_int=None, value_ints=None, value_string=None, value_strings=None):
   if value is not None: return value
@@ -144,7 +147,7 @@ def Expand(x: Tensor, shape):
 
 def Gemm(A: Tensor, B: Tensor, C: Tensor=None, alpha=1.0, beta=1.0, transA=0, transB=0, broadcast=0):
   ret = alpha * (A.transpose(transA) @ B.transpose(transB))
-  if C is not None: ret += beta * (C if broadcast == 0 else C.reshape([-1 if i <  len(C.shape) else 1 for i in range(ret.ndim)][::-1]))
+  if C is not None: ret = ret + beta * (C if broadcast == 0 else C.reshape([-1 if i <  len(C.shape) else 1 for i in range(ret.ndim)][::-1]))
   return ret
 
 def Einsum(*Inputs: List[Tensor], equation): return Tensor.einsum(equation, Inputs)
